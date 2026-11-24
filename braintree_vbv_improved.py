@@ -110,10 +110,15 @@ class ProxyManager:
 
         apify_cfg = self._cfg.get("proxy", "apify")
         if apify_cfg and apify_cfg.get("enabled"):
+            # Leer password desde variable de entorno primero, luego del config
+            pwd_env = apify_cfg.get("password_env", "")
+            password = os.environ.get(pwd_env, "") if pwd_env else ""
+            if not password:
+                password = apify_cfg.get("password", "")
             url = apify_cfg["url_template"].format(
                 country=country,
                 session=uuid.uuid4().hex,
-                password=apify_cfg["password"]
+                password=password
             )
             return {"http": url, "https": url}
 

@@ -18,3 +18,6 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Config (contiene placeholders de credenciales)
+braintree_config.json
