@@ -1,0 +1,20 @@
+# Logs
+braintree_results.log
+braintree_results.csv
+
+# Cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment
+.env
+*.env
+
+# OS
+Thumbs.db
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
