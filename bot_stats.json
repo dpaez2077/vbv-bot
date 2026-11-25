@@ -1,0 +1,18 @@
+{
+  "total_checks": 1,
+  "success": 1,
+  "fail": 0,
+  "by_bin": {
+    "541547": {
+      "count": 1,
+      "brand": "MasterCard",
+      "last_result": "authenticate_successful | Y"
+    }
+  },
+  "users": {
+    "667907621": {
+      "username": "CualPrimaGonorrea",
+      "checks": 1
+    }
+  }
+}
