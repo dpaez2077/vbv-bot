@@ -63,10 +63,80 @@ CONFIG_PATH = BASE_DIR / "braintree_config.json"
 STATS_PATH = BASE_DIR / "bot_stats.json"
 RESULTS_CSV = BASE_DIR / "bot_results.csv"
 
-# ── User whitelist (IDs de Telegram autorizados) ───────────────────────
-# Dejar vacío = todos autorizados. Agregar IDs numéricos para restringir.
-ALLOWED_USERS: List[int] = []
-# Para obtener tu ID: envía /start al bot y revisa los logs
+# ── Admin ID ──────────────────────────────────────────────────────────
+# El admin puede gestionar la whitelist. Se lee de .env o variable de entorno.
+# Si no se configura, el primer usuario que use /wl add queda como admin.
+ADMIN_ID = int(os.environ.get("ADMIN_ID", "0"))
+
+# ── Whitelist path ────────────────────────────────────────────────────
+WHITELIST_PATH = BASE_DIR / "whitelist.json"
+
+# ── Whitelist Manager ─────────────────────────────────────────────────
+
+class WhitelistManager:
+    """Gestiona lista blanca de usuarios autorizados vía comandos."""
+
+    def __init__(self):
+        self._data = self._load()
+
+    def _load(self) -> Dict:
+        if WHITELIST_PATH.exists():
+            try:
+                with open(WHITELIST_PATH, "r") as f:
+                    return json.load(f)
+            except:
+                pass
+        return {"enabled": False, "users": []}
+
+    def _save(self):
+        with open(WHITELIST_PATH, "w") as f:
+            json.dump(self._data, f, indent=2)
+
+    @property
+    def enabled(self) -> bool:
+        return self._data.get("enabled", False)
+
+    @enabled.setter
+    def enabled(self, value: bool):
+        self._data["enabled"] = value
+        self._save()
+
+    @property
+    def users(self) -> List[int]:
+        return self._data.get("users", [])
+
+    def add(self, user_id: int) -> str:
+        if user_id in self.users:
+            return f"🐍 El usuario `{user_id}` ya está en la whitelist."
+        self._data["users"].append(user_id)
+        self._save()
+        return f"🐍 Usuario `{user_id}` agregado a la whitelist."
+
+    def remove(self, user_id: int) -> str:
+        if user_id not in self.users:
+            return f"🐍 El usuario `{user_id}` no está en la whitelist."
+        self._data["users"].remove(user_id)
+        self._save()
+        return f"🐍 Usuario `{user_id}` eliminado de la whitelist."
+
+    def list_users(self) -> str:
+        if not self.users:
+            return "🐍 No hay usuarios en la whitelist."
+        lines = ["🐍 **Whitelist**", ""]
+        lines.append(f"├ Estado: `{'ACTIVADA' if self.enabled else 'DESACTIVADA'}`")
+        lines.append(f"├ Usuarios: `{len(self.users)}`")
+        for uid in self.users:
+            lines.append(f"└ `{uid}`")
+        return "\n".join(lines)
+
+    def is_authorized(self, user_id: int) -> bool:
+        if not self.enabled:
+            return True
+        return user_id in self.users
+
+
+# Instancia global
+WL = WhitelistManager()
 
 # ── Stats manager ──────────────────────────────────────────────────────
 
@@ -327,16 +397,98 @@ def get_proxy_status() -> str:
 
 # ── Auth check ─────────────────────────────────────────────────────────
 
-def is_authorized(user_id: int) -> bool:
-    if not ALLOWED_USERS:
-        return True
-    return user_id in ALLOWED_USERS
-
 def auth_check(update: Update) -> bool:
     user = update.effective_user
-    if not is_authorized(user.id):
+    if not WL.is_authorized(user.id):
         return False
     return True
+
+# ── Whitelist command ─────────────────────────────────────────────────
+
+def is_admin(user_id: int) -> bool:
+    """Verifica si un usuario es admin. Si ADMIN_ID=0, cualquiera puede gestionar."""
+    if ADMIN_ID == 0:
+        return True
+    return user_id == ADMIN_ID
+
+async def cmd_whitelist(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/wl add <id> | /wl remove <id> | /wl list | /wl on | /wl off"""
+    user = update.effective_user
+    user_is_admin = is_admin(user.id)
+
+    if not context.args:
+        text = (
+            "🐍 **Whitelist Manager**\n\n"
+            "`/wl list` — Listar usuarios\n"
+            "`/wl add <id>` — Agregar usuario\n"
+            "`/wl remove <id>` — Eliminar usuario\n"
+            "`/wl on` — Activar whitelist\n"
+            "`/wl off` — Desactivar whitelist\n\n"
+            "📌 Para obtener tu ID, escribe `/id`\n"
+        )
+        if ADMIN_ID != 0:
+            text += f"\n🔑 Solo el admin (`{ADMIN_ID}`) puede usar add/remove/on/off."
+        await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+        return
+
+    cmd = context.args[0].lower()
+
+    # ── Comandos que solo el admin puede ejecutar ────────────────────
+    admin_cmds = {"add", "remove", "on", "off"}
+    if cmd in admin_cmds and not user_is_admin:
+        await update.message.reply_text(
+            f"🐍 Solo el administrador (`{ADMIN_ID}`) puede usar este comando.\n"
+            f"Tu ID es: `{user.id}`",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return
+
+    if cmd == "list":
+        await update.message.reply_text(WL.list_users(), parse_mode=ParseMode.MARKDOWN)
+
+    elif cmd == "on":
+        WL.enabled = True
+        await update.message.reply_text("🐍 Whitelist **activada**. Solo usuarios autorizados pueden usar el bot.", parse_mode=ParseMode.MARKDOWN)
+
+    elif cmd == "off":
+        WL.enabled = False
+        await update.message.reply_text("🐍 Whitelist **desactivada**. Todos los usuarios pueden usar el bot.", parse_mode=ParseMode.MARKDOWN)
+
+    elif cmd == "add":
+        if len(context.args) < 2:
+            await update.message.reply_text("🐍 Uso: `/wl add 123456789`", parse_mode=ParseMode.MARKDOWN)
+            return
+        try:
+            uid = int(context.args[1])
+            result = WL.add(uid)
+            await update.message.reply_text(result, parse_mode=ParseMode.MARKDOWN)
+        except ValueError:
+            await update.message.reply_text("🐍 El ID debe ser un número.")
+
+    elif cmd == "remove":
+        if len(context.args) < 2:
+            await update.message.reply_text("🐍 Uso: `/wl remove 123456789`", parse_mode=ParseMode.MARKDOWN)
+            return
+        try:
+            uid = int(context.args[1])
+            result = WL.remove(uid)
+            await update.message.reply_text(result, parse_mode=ParseMode.MARKDOWN)
+        except ValueError:
+            await update.message.reply_text("🐍 El ID debe ser un número.")
+
+    else:
+        await update.message.reply_text("🐍 Subcomando inválido. Usa: `add`, `remove`, `list`, `on`, `off`", parse_mode=ParseMode.MARKDOWN)
+
+
+async def cmd_myid(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Muestra el ID del usuario."""
+    user = update.effective_user
+    await update.message.reply_text(
+        f"🐍 Tu ID de Telegram es:\n`{user.id}`\n\n"
+        f"Username: @{user.username or 'N/A'}\n"
+        f"Nombre: {user.first_name or ''} {user.last_name or ''}",
+        parse_mode=ParseMode.MARKDOWN
+    )
 
 # ═══════════════════════════════════════════════════════════════════════
 #  HANDLERS
@@ -358,6 +510,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "`/stats` — Estadísticas\n"
         "`/proxy on/off` — Proxy toggle\n"
         "`/export` — Exportar CSV\n"
+        "`/wl add/remove/list/on/off` — Whitelist\n"
+        "`/id` — Tu ID de Telegram\n"
         "`/help` — Ayuda completa\n\n"
         "Ej: `/vbv 4000056655665556|12|28|123`",
         parse_mode=ParseMode.MARKDOWN
@@ -379,6 +533,13 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "`/proxy on` — Activar proxy\n"
         "`/proxy off` — Desactivar proxy\n"
         "`/proxy` — Ver estado\n\n"
+        "**Whitelist:**\n"
+        "`/wl add <id>` — Agregar usuario\n"
+        "`/wl remove <id>` — Eliminar usuario\n"
+        "`/wl list` — Listar usuarios\n"
+        "`/wl on` — Activar whitelist\n"
+        "`/wl off` — Desactivar whitelist\n"
+        "`/id` — Tu ID de Telegram\n\n"
         "**Respuestas 3DS:**\n"
         "🟢 `N` = No enrolado, bypass\n"
         "🟢 `Y` = Autenticado\n"
@@ -633,8 +794,9 @@ def main():
         else:
             return
 
+    wl_status = f"Whitelist: {'ACTIVADA' if WL.enabled else 'DESACTIVADA'} ({len(WL.users)} users)"
     print(f"  Starting Hydra VBV Bot v3.0...")
-    print(f"  Allowed users: {'Todos' if not ALLOWED_USERS else ALLOWED_USERS}")
+    print(f"  {wl_status}")
     print(f"  Bot is running. Press Ctrl+C to stop.")
 
     app = Application.builder().token(token).build()
@@ -651,6 +813,8 @@ def main():
     app.add_handler(CommandHandler("batch", cmd_batch_start))
     app.add_handler(CommandHandler("done", handle_message))
     app.add_handler(CommandHandler("cancel", handle_message))
+    app.add_handler(CommandHandler("wl", cmd_whitelist))
+    app.add_handler(CommandHandler("id", cmd_myid))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     app.run_polling()
