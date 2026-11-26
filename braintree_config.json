@@ -42,7 +42,9 @@
             "url_template": "http://groups-RESIDENTIAL,country-{country},session-{session}:{password}@proxy.apify.com:8000",
             "password_env": "APIFY_PROXY_PASSWORD"
         },
-        "fallback_proxies": [],
+        "fallback_proxies": [
+            "socks5://cw5hr7btmix-country-us-pools-13:KdiptayQdMcpMkhN@global.socksnode.com:11000"
+        ],
         "country_rotation": ["US", "GB", "CA"],
         "rotate_on_fail": true
     },
