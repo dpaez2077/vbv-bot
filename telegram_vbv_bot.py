@@ -442,7 +442,7 @@ async def cmd_whitelist(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         if ADMIN_ID != 0:
             text += f"\n🔑 Solo el admin (`{ADMIN_ID}`) puede usar add/remove/on/off."
-        await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(text)
         return
 
     cmd = context.args[0].lower()
@@ -451,57 +451,55 @@ async def cmd_whitelist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     admin_cmds = {"add", "remove", "on", "off"}
     if cmd in admin_cmds and not user_is_admin:
         await update.message.reply_text(
-            f"🐍 Solo el administrador (`{ADMIN_ID}`) puede usar este comando.\n"
-            f"Tu ID es: `{user.id}`",
-            parse_mode=ParseMode.MARKDOWN
+            f"🐍 Solo el administrador ({ADMIN_ID}) puede usar este comando.\n"
+            f"Tu ID es: {user.id}"
         )
         return
 
     if cmd == "list":
-        await update.message.reply_text(WL.list_users(), parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(WL.list_users())
 
     elif cmd == "on":
         WL.enabled = True
-        await update.message.reply_text("🐍 Whitelist **activada**. Solo usuarios autorizados pueden usar el bot.", parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text("🐍 Whitelist **activada**. Solo usuarios autorizados pueden usar el bot.")
 
     elif cmd == "off":
         WL.enabled = False
-        await update.message.reply_text("🐍 Whitelist **desactivada**. Todos los usuarios pueden usar el bot.", parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text("🐍 Whitelist **desactivada**. Todos los usuarios pueden usar el bot.")
 
     elif cmd == "add":
         if len(context.args) < 2:
-            await update.message.reply_text("🐍 Uso: `/wl add 123456789`", parse_mode=ParseMode.MARKDOWN)
+            await update.message.reply_text("🐍 Uso: `/wl add 123456789`")
             return
         try:
             uid = int(context.args[1])
             result = WL.add(uid)
-            await update.message.reply_text(result, parse_mode=ParseMode.MARKDOWN)
+            await update.message.reply_text(result)
         except ValueError:
             await update.message.reply_text("🐍 El ID debe ser un número.")
 
     elif cmd == "remove":
         if len(context.args) < 2:
-            await update.message.reply_text("🐍 Uso: `/wl remove 123456789`", parse_mode=ParseMode.MARKDOWN)
+            await update.message.reply_text("🐍 Uso: `/wl remove 123456789`")
             return
         try:
             uid = int(context.args[1])
             result = WL.remove(uid)
-            await update.message.reply_text(result, parse_mode=ParseMode.MARKDOWN)
+            await update.message.reply_text(result)
         except ValueError:
             await update.message.reply_text("🐍 El ID debe ser un número.")
 
     else:
-        await update.message.reply_text("🐍 Subcomando inválido. Usa: `add`, `remove`, `list`, `on`, `off`", parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text("🐍 Subcomando inválido. Usa: `add`, `remove`, `list`, `on`, `off`")
 
 
 async def cmd_myid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Muestra el ID del usuario."""
     user = update.effective_user
     await update.message.reply_text(
-        f"🐍 Tu ID de Telegram es:\n`{user.id}`\n\n"
+        f"🐍 Tu ID de Telegram es: {user.id}\n\n"
         f"Username: @{user.username or 'N/A'}\n"
-        f"Nombre: {user.first_name or ''} {user.last_name or ''}",
-        parse_mode=ParseMode.MARKDOWN
+        f"Nombre: {user.first_name or ''} {user.last_name or ''}"
     )
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -516,19 +514,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     await update.message.reply_text(
-        "🐍 **Hydra VBV Bot v3.0**\n\n"
-        "**Comandos:**\n"
-        "`/vbv numero|mm|yy|cvv` — VBV check\n"
-        "`/bin 554843` — Info del BIN\n"
-        "`/batch` — Múltiples tarjetas\n"
-        "`/stats` — Estadísticas\n"
-        "`/proxy on/off` — Proxy toggle\n"
-        "`/export` — Exportar CSV\n"
-        "`/wl add/remove/list/on/off` — Whitelist\n"
-        "`/id` — Tu ID de Telegram\n"
-        "`/help` — Ayuda completa\n\n"
-        "Ej: `/vbv 4000056655665556|12|28|123`",
-        parse_mode=ParseMode.MARKDOWN
+        "🐍 Hydra VBV Bot v3.0\n\n"
+        "Comandos:\n"
+        "/vbv numero|mm|yy|cvv — VBV check\n"
+        "/bin 554843 — Info del BIN\n"
+        "/batch — Multiples tarjetas\n"
+        "/stats — Estadisticas\n"
+        "/proxy on/off — Proxy toggle\n"
+        "/export — Exportar CSV\n"
+        "/wl add/remove/list/on/off — Whitelist\n"
+        "/id — Tu ID de Telegram\n"
+        "/help — Ayuda completa\n\n"
+        "Ej: /vbv 4000056655665556|12|28|123"
     )
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -563,27 +560,27 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "⚫ `U` = No disponible\n\n"
         "**Host:** `localhost` — Cloud próximamente"
     )
-    await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_text(text)
 
 async def cmd_bin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not auth_check(update): return
     if not context.args:
-        await update.message.reply_text("🐍 Uso: `/bin 554843`", parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text("🐍 Uso: `/bin 554843`")
         return
     bin_num = re.sub(r'\D', '', context.args[0])[:8]
     if len(bin_num) < 6:
         await update.message.reply_text("🐍 El BIN debe tener al menos 6 dígitos.")
         return
-    msg = await update.message.reply_text(f"🐍 Buscando BIN `{bin_num}`...", parse_mode=ParseMode.MARKDOWN)
+    msg = await update.message.reply_text(f"🐍 Buscando BIN `{bin_num}`...")
     data = BINLookup.lookup(bin_num)
-    await msg.edit_text(BINLookup.format(data), parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
+    await msg.edit_text(BINLookup.format(data), disable_web_page_preview=True)
 
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not auth_check(update): return
     stats = StatsManager().get_summary()
     total = stats["total_checks"]
     if total == 0:
-        await update.message.reply_text("🐍 No hay estadísticas aún. Usa `/vbv` para empezar.", parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text("🐍 No hay estadísticas aún. Usa `/vbv` para empezar.")
         return
     rate = (stats["success"] / total * 100) if total > 0 else 0
     lines = [
@@ -598,7 +595,7 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     top_bins = sorted(stats["by_bin"].items(), key=lambda x: -x[1]["count"])[:5]
     for bin_num, info in top_bins:
         lines.append(f"├ `{bin_num}` ({info['brand']}): {info['count']}x")
-    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_text("\n".join(lines))
 
 async def cmd_proxy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not auth_check(update): return
@@ -620,7 +617,7 @@ async def cmd_proxy(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 status += f"\n└ Estado: `❌ Caído: {result['error'][:60]}`"
         else:
             status += "\n└ Sin proxy configurado"
-        await update.message.reply_text(status, parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(status)
         return
 
     arg = context.args[0].lower()
@@ -630,7 +627,7 @@ async def cmd_proxy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         result = set_proxy_enabled(False)
     else:
         result = "🐍 Usa: `/proxy on` o `/proxy off`"
-    await update.message.reply_text(result, parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_text(result)
 
 async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not auth_check(update): return
@@ -645,12 +642,11 @@ async def cmd_batch_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["batch_mode"] = True
     context.user_data["batch_cards"] = []
     await update.message.reply_text(
-        "🐍 **Modo Batch activado**\n\n"
-        "Envía las tarjetas, 1 por línea:\n"
-        "`5548435904230378|06|30|885`\n"
-        "`4000056655665556|12|28|123`\n\n"
-        "Envía `/done` para ejecutar o `/cancel` para salir.",
-        parse_mode=ParseMode.MARKDOWN
+        "🐍 Modo Batch activado\n\n"
+        "Envia las tarjetas, 1 por linea:\n"
+        "5548435904230378|06|30|885\n"
+        "4000056655665556|12|28|123\n\n"
+        "Envia /done para ejecutar o /cancel para salir."
     )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -678,18 +674,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 card, mm, yy, cvv = parsed
                 val_err = CardValidator.validate(card, mm, yy, cvv)
                 if val_err:
-                    await update.message.reply_text(f"❌ `{card[:6]}...` {val_err}", parse_mode=ParseMode.MARKDOWN)
+                    await update.message.reply_text(f"❌ `{card[:6]}...` {val_err}")
                 else:
                     context.user_data["batch_cards"].append(parsed)
-                    await update.message.reply_text(f"✅ `{card[:6]}...` agregada ({len(context.user_data['batch_cards'])})", parse_mode=ParseMode.MARKDOWN)
+                    await update.message.reply_text(f"✅ `{card[:6]}...` agregada ({len(context.user_data['batch_cards'])})")
             else:
-                await update.message.reply_text("🐍 Formato inválido. Usa: `numero|mm|yy|cvv`", parse_mode=ParseMode.MARKDOWN)
+                await update.message.reply_text("🐍 Formato inválido. Usa: `numero|mm|yy|cvv`")
             return
 
     # ── Si no es batch, ignorar mensajes sueltos ────────────────────
     await update.message.reply_text(
-        "🐍 Usa `/vbv numero|mm|yy|cvv` o `/help` para ayuda.",
-        parse_mode=ParseMode.MARKDOWN
+        "🐍 Usa /vbv numero|mm|yy|cvv o /help para ayuda."
     )
 
 async def process_batch(update: Update, context: ContextTypes.DEFAULT_TYPE, cards: List[Tuple]):
@@ -723,7 +718,7 @@ async def process_batch(update: Update, context: ContextTypes.DEFAULT_TYPE, card
     for card_bin, brand, parsed in results:
         icon = "✅" if "✗" not in parsed["raw"] else "❌"
         lines.append(f"{icon} `{card_bin}` ({brand}) → {parsed['label']}")
-    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_text("\n".join(lines))
 
 async def cmd_vbv(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not auth_check(update): return
