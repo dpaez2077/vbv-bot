@@ -290,10 +290,22 @@ ERROR_MAP = {
 }
 
 def parse_result(raw: str) -> Dict:
-    result = {"raw": raw, "type": "unknown", "icon": "❓", "label": "UNKNOWN", "status_code": "", "explanation": "Resultado no reconocido.", "challenge_url": ""}
+    result = {"raw": raw, "type": "unknown", "icon": "❓", "label": "UNKNOWN", "status_code": "", "explanation": "Resultado no reconocido.", "challenge_url": "", "country": ""}
 
-    if raw.startswith("CHALLENGE"):
-        parts = raw.split(" | ", 2)
+    # Extraer pais del final (formato: "resultado | 🌐 US")
+    country = ""
+    country_match = re.search(r' \| 🌐 ([A-Z]{2})$', raw)
+    if country_match:
+        country = country_match.group(1)
+        raw_clean = raw[:country_match.start()]
+    else:
+        raw_clean = raw
+
+    result["country"] = country
+    result["raw"] = raw_clean
+
+    if raw_clean.startswith("CHALLENGE"):
+        parts = raw_clean.split(" | ", 2)
         result["type"] = "challenge"
         result["icon"] = "🔴"
         result["label"] = "CHALLENGE REQUIRED"
@@ -303,17 +315,17 @@ def parse_result(raw: str) -> Dict:
         return result
 
     for err_prefix, err_text in ERROR_MAP.items():
-        if raw.startswith(err_prefix):
+        if raw_clean.startswith(err_prefix):
             result["type"] = "error"
             result["icon"] = "❌"
             result["label"] = err_prefix
             result["explanation"] = err_text
-            detail = raw.replace(err_prefix, "", 1).strip().lstrip("|").strip()
+            detail = raw_clean.replace(err_prefix, "", 1).strip().lstrip("|").strip()
             if detail:
-                result["explanation"] += f"\n\n📋 Detalle: `{detail[:200]}`"
+                result["explanation"] += f"\n\nDetalle: {detail[:200]}"
             return result
 
-    parts = raw.split(" | ")
+    parts = raw_clean.split(" | ")
     status_3ds = parts[0].strip() if len(parts) > 0 else ""
     trans_status = parts[1].strip() if len(parts) > 1 else ""
     result["status_code"] = trans_status
@@ -334,21 +346,23 @@ def parse_result(raw: str) -> Dict:
     return result
 
 def format_response(card_bin: str, brand: str, parsed: Dict) -> str:
-    lines = [f"🐍 **VBV CHECK**", ""]
-    lines.append(f"┌ BIN: `{card_bin}`")
-    lines.append(f"├ Brand: `{brand}`")
-    lines.append(f"└ Resultado: {parsed['icon']} **{parsed['label']}**")
+    lines = [f"🐍 VBV CHECK", ""]
+    lines.append(f"BIN: {card_bin}")
+    lines.append(f"Brand: {brand}")
+    if parsed.get("country"):
+        lines.append(f"Proxy: {parsed['country']}")
+    lines.append(f"Resultado: {parsed['icon']} {parsed['label']}")
     lines.append("")
     if parsed["status_code"]:
-        lines.append(f"**TransStatus:** `{parsed['status_code']}`")
+        lines.append(f"TransStatus: {parsed['status_code']}")
         lines.append("")
     lines.append(parsed["explanation"])
     if parsed.get("challenge_url"):
         lines.append("")
-        lines.append(f"🔗 Challenge (primeros 80):")
-        lines.append(f"`{parsed['challenge_url'][:80]}...`")
+        lines.append(f"Challenge (primeros 80):")
+        lines.append(f"{parsed['challenge_url'][:80]}...")
     lines.append("")
-    lines.append(f"`{parsed['raw'][:100]}`")
+    lines.append(f"{parsed['raw'][:100]}")
     return "\n".join(lines)
 
 # ── Card formatter ─────────────────────────────────────────────────────
@@ -715,9 +729,8 @@ async def cmd_vbv(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not auth_check(update): return
     if not context.args:
         await update.message.reply_text(
-            "🐍 Uso: `/vbv numero|mm|yy|cvv`\n"
-            "Ej: `/vbv 5548435904230378|06|30|885`",
-            parse_mode=ParseMode.MARKDOWN
+            "🐍 Uso: /vbv numero|mm|yy|cvv\n"
+            "Ej: /vbv 5548435904230378|06|30|885"
         )
         return
 
@@ -725,9 +738,8 @@ async def cmd_vbv(update: Update, context: ContextTypes.DEFAULT_TYPE):
     parsed = parse_card_line(raw_input)
     if not parsed:
         await update.message.reply_text(
-            "🐍 Formato inválido. Usa: `/vbv numero|mm|yy|cvv`\n"
-            "Separa con `|` `,` `.` o espacio.",
-            parse_mode=ParseMode.MARKDOWN
+            "🐍 Formato invalido. Usa: /vbv numero|mm|yy|cvv\n"
+            "Separa con | , . o espacio."
         )
         return
 
@@ -740,15 +752,14 @@ async def cmd_vbv(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if val_err:
         parsed_resp = {"type": "error", "icon": "❌", "label": "VALIDATION ERROR",
                        "status_code": "", "explanation": f"Error: {val_err}",
-                       "challenge_url": "", "raw": f"✗ VALIDATION | {val_err}"}
+                       "challenge_url": "", "country": "", "raw": f"VALIDATION | {val_err}"}
         await update.message.reply_text(
-            format_response(card_bin, brand, parsed_resp), parse_mode=ParseMode.MARKDOWN
+            format_response(card_bin, brand, parsed_resp)
         )
         return
 
     msg = await update.message.reply_text(
-        f"🐍 Procesando...\nBIN: `{card_bin}` ({brand})",
-        parse_mode=ParseMode.MARKDOWN
+        f"Procesando... BIN: {card_bin} ({brand})"
     )
 
     try:
@@ -764,9 +775,9 @@ async def cmd_vbv(update: Update, context: ContextTypes.DEFAULT_TYPE):
         StatsManager().record(user.id, username, card_bin, brand, result)
         CSVLogger().log(username, card_bin, brand, result)
 
-        await msg.edit_text(response, parse_mode=ParseMode.MARKDOWN)
+        await msg.edit_text(response)
     except Exception as e:
-        await msg.edit_text(f"🐍 **ERROR INESPERADO**\n\n`{e}`", parse_mode=ParseMode.MARKDOWN)
+        await msg.edit_text(f"ERROR INESPERADO\n{e}")
 
 # ═══════════════════════════════════════════════════════════════════════
 #  MAIN

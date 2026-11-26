@@ -101,7 +101,12 @@ class ProxyManager:
         self._cfg = cfg
         self._current_country_idx = 0
         self._lock = threading.Lock()
-        self._session_id = uuid.uuid4().hex  # sticky session for IP persistence
+        self._session_id = uuid.uuid4().hex
+        self._current_country = "US"
+
+    @property
+    def current_country(self) -> str:
+        return self._current_country
 
     def get_proxy(self, country_override: str = None) -> Dict[str, str]:
         with self._lock:
@@ -111,6 +116,7 @@ class ProxyManager:
             else:
                 country = countries[self._current_country_idx % len(countries)]
                 self._current_country_idx += 1
+            self._current_country = country
 
         apify_cfg = self._cfg.get("proxy", "apify")
         if apify_cfg and apify_cfg.get("enabled"):
@@ -136,7 +142,7 @@ class ProxyManager:
         """Rotar al siguiente pais en la lista."""
         with self._lock:
             self._current_country_idx += 1
-            self._session_id = uuid.uuid4().hex  # nueva sesion para nuevo pais
+            self._session_id = uuid.uuid4().hex
 
 
 class ProxyValidator:
@@ -780,11 +786,13 @@ class BraintreeVBVEngine:
         retry_on = self._cfg.get("retry", "retry_on", default=[])
         retry_delay = self._cfg.get("timing", "retry_delay", default=3.0)
         card_bin = card[:6]
-        max_country_rotations = 3  # max cambios de pais antes de rendirse
+        max_country_rotations = 3
+        used_country = "US"
 
         for attempt in range(1, max_retries + 1):
             for country_try in range(max_country_rotations):
                 sess, fp, identity = self._new_session()
+                used_country = self._proxy_mgr.current_country
                 email = identity["email"]
 
                 # Step 1
@@ -793,7 +801,7 @@ class BraintreeVBVEngine:
                     if attempt < max_retries and any(e in err for e in retry_on):
                         time.sleep(retry_delay)
                         continue
-                    return err
+                    return f"{err} | 🌐 {used_country}"
                 self._delay()
 
                 # Step 2
@@ -802,37 +810,36 @@ class BraintreeVBVEngine:
                     if attempt < max_retries and any(e in err for e in retry_on):
                         time.sleep(retry_delay)
                         continue
-                    return err
+                    return f"{err} | 🌐 {used_country}"
                 self._delay()
 
                 # Step 3
                 err = self._step_email(sess, fp, cart_id, email)
                 if err:
-                    return err
+                    return f"{err} | 🌐 {used_country}"
                 self._delay()
 
                 # Step 4
                 err = self._step_methods(sess, fp, cart_id, cart_total)
                 if err:
-                    return err
+                    return f"{err} | 🌐 {used_country}"
                 self._delay()
 
                 # Step 5
                 err = self._step_select(sess, fp, cart_id, email)
                 if err:
-                    return err
+                    return f"{err} | 🌐 {used_country}"
                 self._delay()
 
                 # Step 6
                 err = self._step_details(sess, fp, cart_id, identity)
                 if err:
-                    return err
+                    return f"{err} | 🌐 {used_country}"
                 self._delay()
 
                 # Step 7
                 err, bt_info = self._step_session(sess, fp, cart_id, cart_total)
                 if err:
-                    # Si es Status=failed, rotar pais y reintentar
                     if "Status=failed" in err and country_try < max_country_rotations - 1:
                         self._proxy_mgr.rotate_country()
                         time.sleep(retry_delay)
@@ -840,26 +847,25 @@ class BraintreeVBVEngine:
                     if attempt < max_retries and any(e in err for e in retry_on):
                         time.sleep(retry_delay)
                         continue
-                    return err
+                    return f"{err} | 🌐 {used_country}"
                 self._delay()
-                break  # salir del bucle de paises si todo ok
+
+                # Step 8
+                err, nonce = self._step_tokenize(sess, fp, bt_info, card, mm, yy, cvv, identity)
+                if err:
+                    return f"{err} | 🌐 {used_country}"
+                self._delay()
+
+                # Step 9
+                result = self._step_3ds(sess, fp, bt_info, nonce, card_bin, email)
+                return f"{result} | 🌐 {used_country}"
+
+                break
             else:
-                continue  # si se acabaron los paises, reintentar
-            break  # salir del bucle de reintentos si todo ok
+                continue
+            break
 
-            # Step 8
-            err, nonce = self._step_tokenize(sess, fp, bt_info, card, mm, yy, cvv, identity)
-            if err:
-                if attempt < max_retries and any(e in err for e in retry_on):
-                    time.sleep(retry_delay)
-                    continue
-                return err
-            self._delay()
-
-            # Step 9
-            return self._step_3ds(sess, fp, bt_info, nonce, card_bin, email)
-
-        return "✗ MAX_RETRIES_EXCEEDED"
+        return f"✗ MAX_RETRIES | 🌐 {used_country}"
 
 ###############################################################################
 #  CARD SOURCE: FILE

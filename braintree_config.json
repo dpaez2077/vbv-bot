@@ -28,36 +28,122 @@
         ]
     },
     "identity": {
-        "email_domains": ["gmail.com", "outlook.com", "yahoo.com", "hotmail.com", "protonmail.com"],
-        "first_names": ["James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph", "Thomas", "Charles"],
-        "last_names": ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez"],
+        "email_domains": [
+            "gmail.com",
+            "outlook.com",
+            "yahoo.com",
+            "hotmail.com",
+            "protonmail.com"
+        ],
+        "first_names": [
+            "James",
+            "John",
+            "Robert",
+            "Michael",
+            "William",
+            "David",
+            "Richard",
+            "Joseph",
+            "Thomas",
+            "Charles"
+        ],
+        "last_names": [
+            "Smith",
+            "Johnson",
+            "Williams",
+            "Brown",
+            "Jones",
+            "Garcia",
+            "Miller",
+            "Davis",
+            "Rodriguez",
+            "Martinez"
+        ],
         "addresses": [
-            {"city": "Lima", "street": "Av. Larco", "house_number": "123", "postal_code": "15074"},
-            {"city": "Lima", "street": "Jr. de la Union", "house_number": "456", "postal_code": "15001"}
+            {
+                "city": "Lima",
+                "street": "Av. Larco",
+                "house_number": "123",
+                "postal_code": "15074"
+            },
+            {
+                "city": "Lima",
+                "street": "Jr. de la Union",
+                "house_number": "456",
+                "postal_code": "15001"
+            }
         ]
     },
-"proxy": {
-    "apify": {
-        "enabled": true,
-        "url_template": "http://groups-RESIDENTIAL,country-{country},session-{session}:{password}@proxy.apify.com:8000",
-        "password_env": "APIFY_PROXY_PASSWORD",
-        "password": ""
+    "proxy": {
+        "apify": {
+            "enabled": true,
+            "url_template": "http://groups-RESIDENTIAL,country-{country},session-{session}:{password}@proxy.apify.com:8000",
+            "password_env": "APIFY_PROXY_PASSWORD"
+        },
+        "fallback_proxies": [],
+        "country_rotation": [
+            "US",
+            "GB",
+            "CA",
+            "CO",
+            "MX",
+            "BR",
+            "PE",
+            "AR",
+            "CL",
+            "EC",
+            "UY",
+            "PA"
+        ],
+        "rotate_on_fail": true
     },
-    "fallback_proxies": [],
-    "country_rotation": ["US", "GB", "CA", "CO", "MX", "BR"],
-    "rotate_on_fail": true
-},
     "fingerprint": {
         "user_agents": [
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:158.0) Gecko/20100101 Firefox/158.0",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         ],
-        "screen_sizes": [{"width": 1920, "height": 1080}, {"width": 1366, "height": 768}],
-        "timezones": [180, 240, 300],
-        "languages": ["en-US,en;q=0.9", "en-GB,en;q=0.8"]
+        "screen_sizes": [
+            {
+                "width": 1920,
+                "height": 1080
+            },
+            {
+                "width": 1366,
+                "height": 768
+            }
+        ],
+        "timezones": [
+            180,
+            240,
+            300
+        ],
+        "languages": [
+            "en-US,en;q=0.9",
+            "en-GB,en;q=0.8"
+        ]
     },
-    "timing": {"min_delay": 0.5, "max_delay": 2.0, "retry_delay": 3.0},
-    "retry": {"max_attempts": 3, "retry_on": ["✗ PRODUCT", "✗ CART", "✗ SESSION", "✗ TOKENIZE"]},
-    "output": {"log_file": "braintree_results.log", "csv_file": "braintree_results.csv", "webhook_url": "", "console_verbose": true},
-    "threading": {"enabled": false, "max_workers": 5}
+    "timing": {
+        "min_delay": 0.5,
+        "max_delay": 2.0,
+        "retry_delay": 3.0
+    },
+    "retry": {
+        "max_attempts": 3,
+        "retry_on": [
+            "\u2717 PRODUCT",
+            "\u2717 CART",
+            "\u2717 SESSION",
+            "\u2717 TOKENIZE"
+        ]
+    },
+    "output": {
+        "log_file": "braintree_results.log",
+        "csv_file": "braintree_results.csv",
+        "webhook_url": "",
+        "console_verbose": true
+    },
+    "threading": {
+        "enabled": false,
+        "max_workers": 5
+    }
 }
